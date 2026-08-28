@@ -4,7 +4,7 @@
 
 <img src="https://count.getloli.com/@preca-hoshino?name=ama-10_entertainment_shu&theme=rule34&padding=7&offset=0&align=top&scale=1&pixelated=1&darkmode=auto" alt="Moe Counter">
 
-**上海大学（SHU）情報表示プラグイン** — キャンパス情報やナビ、画像をひとつのコマンドで呼び出せます。
+**上海大学（SHU）信息展示插件** — 把常用校园信息、导航与图片做成一句指令，随叫随发。
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
 ![Python Version](https://img.shields.io/badge/Python-3.10%2B-blue)
@@ -18,43 +18,43 @@
 
 ---
 
-## 概要
+## 简介
 
-`astrbot_plugin_ama-10_entertainment_shu` は [AstrBot](https://github.com/AstrBotDevs/AstrBot) ベースの SHU グルチャ情報プラグインです。各コマンドは `src/` 以下のサブフォルダに対応し、そのコマンドの `handler.py` とリソース画像を含みます。ロジックはコマンドごとに独立しています — 画像を差し替えるだけで内容を更新でき、コード変更は不要です。
+`astrbot_plugin_ama-10_entertainment_shu` 是一个基于 [AstrBot](https://github.com/AstrBotDevs/AstrBot) 的 SHU 群聊信息插件。每个指令对应 `src/` 下的一个子文件夹，内含该指令的 `handler.py` 与资源图片，逻辑互相独立——替换图片即可更新内容，无需改代码。
 
-## 特徴
+## 特性
 
-- ひとつのコマンドでひとつの機能を呼び出せる
-- 各コマンドが独立したサブフォルダにあり、画像を差し替えるだけで更新可能
-- コマンドロジックとリソースが分離されている
-- 複数画像をファイル名順に送信可能
+- 一个指令对应一个功能，随叫随发
+- 每个指令独立存放在自己的子文件夹，换图即更新，无需改代码
+- 指令逻辑与资源解耦
+- 支持多张图片，按文件名顺序发送
 
-## ディレクトリ構成
+## 目录结构
 
 ```
 astrbot_plugin_ama-10_entertainment_shu/
-├── main.py          # プラグインエントリ: コマンド登録 + 各ハンドラの動的読み込み
-├── metadata.yaml    # プラグインメタデータ
-└── src/             # コマンドディレクトリ（各サブフォルダ = ひとつのコマンド）
-    └── <コマンド名>/ # 例: 群号大全/ 校历/ 鼠鼠导航/
-        ├── handler.py   # コマンド実行ロジック
-        └── 画像(任意)    # ファイル名順に送信
+├── main.py          # 插件入口: 注册命令 + 动态加载各命令 handler
+├── metadata.yaml    # 插件元数据
+└── src/             # 命令目录(每个子文件夹 = 一个命令)
+    └── <命令名>/     # 如 群号大全/ 校历/ 鼠鼠导航/
+        ├── handler.py   # 命令执行逻辑
+        └── 图片(可选)    # 按文件名顺序发送
 ```
 
-## コンテンツの更新
+## 更新内容
 
-対応コマンドフォルダに画像を置くだけでOK（`png` / `jpg` / `jpeg` / `webp` / `gif` / `bmp` 対応、複数可、ファイル名順に送信）。その後 WebUI でこのプラグインの「プラグインを再読み込み」を実行すれば反映されます。
+将图片放入对应命令文件夹（支持 `png` / `jpg` / `jpeg` / `webp` / `gif` / `bmp`，可放多张，按文件名顺序发送），然后在 WebUI 对本插件执行「重载插件」即可生效。
 
-## コマンドの追加
+## 新增命令
 
-1. `src/<コマンド名>/handler.py` を作成（`handle(event)` を定義）;
-2. `main.py` の `COMMAND_DIRS` にマッピングを登録;
-3. `_dispatch(event, "<コマンド名>")` を呼ぶ `@filter.command("<コマンド名>")` ハンドラを追加。
+1. 创建 `src/<命令名>/handler.py`（定义 `handle(event)`）；
+2. 在 `main.py` 的 `COMMAND_DIRS` 中注册映射；
+3. 添加 `@filter.command("指令名")` handler 调用 `_dispatch(event, "<命令名>")`。
 
-## ライセンス
+## 许可证
 
-このプロジェクトは [GNU AGPL-3.0](LICENSE) の下でライセンスされています。
+本项目源代码基于 [GNU AGPL-3.0](LICENSE) 许可证开源。
 
-> **著作権表示**: 本プロジェクトに含まれる画像および MEME（ミーム）リソースの著作権は、**上海大学**、**上海大学学盟社**、**上海大学学生会**、**西门情报站** などの関連機関に帰属します。
+> **版权声明**：本项目内所涉及的图片及 MEME（模因）资源，其版权均归 **上海大学**、**上海大学学盟社**、**上海大学学生会**、**西门情报站** 等相关组织机构所有。
 
-> **謝辞**: **[ShuNav](https://shunav.iafenvoy.com/)**、**[Course Rate](https://course-rate.icu/)** などのオープンソースプロジェクトが提供するオープンエコシステムに感謝します。
+> **致谢**：感谢 **[鼠鼠导航](https://shunav.iafenvoy.com/)**、**[选课小本本](https://course-rate.icu/)** 等开源项目提供的开放生态支持。
