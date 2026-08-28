@@ -73,36 +73,40 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SSH_PORT || '22' }}
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
-          host_key_check: ${{ secrets.SSH_FINGERPRINT != '' }}
           fingerprint: ${{ secrets.SSH_FINGERPRINT }}
           # 把以下环境变量安全传给远程脚本
           envs: ASTRBOT_PORT,ASTRBOT_API_KEY,PLUGIN_ID
           script: |
             set -euo pipefail
 
-            base="http://127.0.0.1:${ASTRBOT_PORT}/api/plugins"
+            # 注意: 必须用 /api/v1/ (OpenAPI) 前缀, API Key 只对 v1 生效。
+            # /api/plugins (Dashboard) 只接受 WebUI JWT, 会对 API Key 返回 401。
+            base="http://127.0.0.1:${ASTRBOT_PORT}/api/v1/plugins"
 
             echo "==== AstrBot 自动部署 (SSH -> localhost) ===="
             echo "host port: ${ASTRBOT_PORT}"
             echo "plugin_id: ${PLUGIN_ID}"
 
-            # helper: 请求本机 AstrBot，打印响应并判断是否成功
+            # helper: 请求本机 AstrBot，打印响应与 HTTP 状态码并判断是否成功
             # 成功 = HTTP 2xx 且返回 JSON 无 "status":"error"
             astrbot_call() {
               local label=$1; shift
-              local resp
+              local out code body
               echo ""
               echo ">>> ${label}"
-              if ! resp=$(curl -fsS "$@"); then
-                echo "::error::${label} HTTP 请求失败"
-                return 1
+              out=$(curl -sS -w $'\n%{http_code}' "$@") || { echo "::error::${label} 网络请求失败"; return 1; }
+              code="${out##*$'\n'}"
+              body="${out%$'\n'*}"
+              echo "${body}"
+              if [ "${code}" -ge 200 ] && [ "${code}" -lt 300 ]; then
+                if echo "${body}" | grep -q '"status"[[:space:]]*:[[:space:]]*"error"'; then
+                  echo "::error::${label} 返回业务错误 (HTTP ${code})"
+                  return 1
+                fi
+                return 0
               fi
-              echo "${resp}"
-              if echo "${resp}" | grep -q '"status"[[:space:]]*:[[:space:]]*"error"'; then
-                echo "::error::${label} 返回业务错误"
-                return 1
-              fi
-              return 0
+              echo "::error::${label} HTTP 请求失败 (${code})"
+              return 1
             }
 
             astrbot_call "1/2 更新插件代码（服务端 git pull）" \
@@ -133,13 +137,12 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SSH_PORT || '22' }}
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
-          host_key_check: ${{ secrets.SSH_FINGERPRINT != '' }}
           fingerprint: ${{ secrets.SSH_FINGERPRINT }}
           envs: ASTRBOT_PORT,ASTRBOT_API_KEY,PLUGIN_ID
           script: |
             echo "::warning::首次调用失败，重试一次（间隔 15s）"
             sleep 15
-            base="http://127.0.0.1:${ASTRBOT_PORT}/api/plugins"
+            base="http://127.0.0.1:${ASTRBOT_PORT}/api/v1/plugins"
             curl -fsS -X POST "${base}/${PLUGIN_ID}/update" \
               -H "X-API-Key: ${ASTRBOT_API_KEY}" \
               -H "Content-Type: application/json" \
