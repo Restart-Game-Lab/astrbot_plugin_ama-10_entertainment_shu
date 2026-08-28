@@ -75,7 +75,7 @@ jobs:
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
           fingerprint: ${{ secrets.SSH_FINGERPRINT }}
           # 把以下环境变量安全传给远程脚本
-          envs: ASTRBOT_PORT,ASTRBOT_API_KEY,PLUGIN_ID
+          envs: ASTRBOT_PORT,ASTRBOT_API_KEY,PLUGIN_ID,PROXY
           script: |
             set -euo pipefail
 
@@ -86,16 +86,16 @@ jobs:
             echo "==== AstrBot 自动部署 (SSH -> localhost) ===="
             echo "host port: ${ASTRBOT_PORT}"
             echo "plugin_id: ${PLUGIN_ID}"
+            echo "proxy    : ${PROXY}"
 
             # helper: 请求本机 AstrBot，打印响应与 HTTP 状态码并判断是否成功
             # 成功 = HTTP 2xx 且返回 JSON 无 "status":"error"
-            # curl 统一超时 300 秒（update 端点需在容器内 git pull，可能较慢）
             astrbot_call() {
               local label=$1; shift
               local out code body
               echo ""
               echo ">>> ${label}"
-              out=$(curl -sS --max-time 3000 -w $'\n%{http_code}' "$@") || { echo "::error::${label} 网络请求失败或超时(300s)"; return 1; }
+              out=$(curl -sS --max-time 300 -w $'\n%{http_code}' "$@") || { echo "::error::${label} 网络请求失败或超时(300s)"; return 1; }
               code="${out##*$'\n'}"
               body="${out%$'\n'*}"
               echo "${body}"
@@ -110,10 +110,18 @@ jobs:
               return 1
             }
 
-            astrbot_call "1/2 更新插件代码（服务端 git pull）" \
+            # update 请求体: 传给 AstrBot 的 proxy 字段(加速站), 加速大文件下载
+            if [ -n "${PROXY}" ]; then
+              update_body="{\"proxy\":\"${PROXY}\"}"
+            else
+              update_body=""
+            fi
+
+            astrbot_call "1/2 更新插件代码（服务端 zip 下载）" \
               -X POST "${base}/${PLUGIN_ID}/update" \
               -H "X-API-Key: ${ASTRBOT_API_KEY}" \
               -H "Content-Type: application/json" \
+              -d "${update_body}" \
               || exit 1
 
             astrbot_call "2/2 重载插件（让新代码生效）" \
@@ -128,3 +136,4 @@ jobs:
           ASTRBOT_PORT: ${{ secrets.ASTRBOT_PORT || '6185' }}
           ASTRBOT_API_KEY: ${{ secrets.ASTRBOT_API_KEY }}
           PLUGIN_ID: ${{ steps.meta.outputs.plugin_id }}
+          PROXY: ${{ vars.ASTRBOT_PROXY }}
