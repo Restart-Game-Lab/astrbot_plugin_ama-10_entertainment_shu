@@ -99,7 +99,7 @@ ssh-keyscan <服务器地址>
 ## 四、触发方式
 
 - **自动**：`push` 到 `main` 分支（含 PR 合并）会自动触发。
-- **手动**：在 GitHub 仓库的 `Actions → AstrBot Deploy via SSH (Update + Reload) → Run workflow` 可手动触发，并可勾选 `dry_run` 只打印请求、不改动。
+- **手动**：在 GitHub 仓库的 `Actions → AstrBot Deploy via SSH (Update + Reload) → Run workflow` 可手动触发。
 
 ---
 

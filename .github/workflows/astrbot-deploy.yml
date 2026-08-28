@@ -12,11 +12,6 @@ on:
   push:
     branches: [main]
   workflow_dispatch: # 支持在 GitHub Actions 页面手动触发
-    inputs:
-      dry_run:
-        description: "Dry run（只打印将调用的端点，不实际更新）"
-        type: boolean
-        default: false
 
 concurrency:
   group: astrbot-deploy
@@ -81,12 +76,11 @@ jobs:
           host_key_check: ${{ secrets.SSH_FINGERPRINT != '' }}
           fingerprint: ${{ secrets.SSH_FINGERPRINT }}
           # 把以下环境变量安全传给远程脚本
-          envs: ASTRBOT_PORT,ASTRBOT_API_KEY,PLUGIN_ID,DRY_RUN
+          envs: ASTRBOT_PORT,ASTRBOT_API_KEY,PLUGIN_ID
         env:
           ASTRBOT_PORT: ${{ secrets.ASTRBOT_PORT || '6185' }}
           ASTRBOT_API_KEY: ${{ secrets.ASTRBOT_API_KEY }}
           PLUGIN_ID: ${{ steps.meta.outputs.plugin_id }}
-          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
         script: |
           set -euo pipefail
 
@@ -95,14 +89,6 @@ jobs:
           echo "==== AstrBot 自动部署 (SSH -> localhost) ===="
           echo "host port: ${ASTRBOT_PORT}"
           echo "plugin_id: ${PLUGIN_ID}"
-          echo "dry_run  : ${DRY_RUN}"
-
-          if [ "${DRY_RUN}" = "true" ]; then
-            echo "::warning::DRY RUN 模式，仅打印将执行的请求"
-            echo "  POST ${base}/${PLUGIN_ID}/update"
-            echo "  POST ${base}/reload   body: { plugin_id: ${PLUGIN_ID} }"
-            exit 0
-          fi
 
           # helper: 请求本机 AstrBot，打印响应并判断是否成功
           # 成功 = HTTP 2xx 且返回 JSON 无 "status":"error"
