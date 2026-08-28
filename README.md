@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="https://count.getloli.com/@preca-hoshino?name=ama-10_entertainment_shu&theme=rule34&padding=7&offset=0&align=top&scale=1&pixelated=1&darkmode=auto" alt="Moe Counter">
+
 **上海大学（SHU）信息展示插件** — 把常用校园信息、导航与图片做成一句指令，随叫随发。
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
