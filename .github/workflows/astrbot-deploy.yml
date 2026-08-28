@@ -1,7 +1,13 @@
-name: AstrBot Deploy (Update + Reload)
+name: AstrBot Deploy via SSH (Update + Reload)
 
-# 任意 push 到 main 分支（含直接提交与合并 PR）后，自动通知 AstrBot
-# 拉取最新代码并重载插件，实现"提交即生效"。
+# AstrBot 端口不对外（仅监听 127.0.0.1）时的自动更新方案：
+# 每次 push 到 main 分支后，GitHub Actions 通过 SSH 登录 AstrBot 所在服务器，
+# 在服务器本地调用 http://127.0.0.1:<port>/api/plugins/... 实现"提交即生效"。
+#
+# 服务器需满足：
+#   1. SSH 可用（OpenSSH Server），且能免密/密钥登录
+#   2. AstrBot 在本机运行，WebUI 端口（默认 6185）监听 127.0.0.1
+#   3. 插件以 git clone 方式安装（metadata.yaml 的 repo 指向本仓库）
 on:
   push:
     branches: [main]
@@ -29,49 +35,66 @@ jobs:
 
       - name: Validate required secrets
         env:
-          ASTRBOT_URL: ${{ secrets.ASTRBOT_URL }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
           ASTRBOT_API_KEY: ${{ secrets.ASTRBOT_API_KEY }}
         run: |
           miss=""
-          [ -z "$ASTRBOT_URL" ] && miss="$miss ASTRBOT_URL"
+          [ -z "$SSH_HOST" ] && miss="$miss SSH_HOST"
+          [ -z "$SSH_USER" ] && miss="$miss SSH_USER"
+          [ -z "$SSH_PRIVATE_KEY" ] && miss="$miss SSH_PRIVATE_KEY"
           [ -z "$ASTRBOT_API_KEY" ] && miss="$miss ASTRBOT_API_KEY"
           if [ -n "$miss" ]; then
             echo "::error::Missing required secrets:$miss"
+            echo ""
             echo "请在 GitHub 仓库 Settings -> Secrets and variables -> Actions 中配置："
-            echo "  ASTRBOT_URL        AstrBot WebUI 地址，例如 http://192.168.1.10:6185"
-            echo "  ASTRBOT_API_KEY    在 AstrBot WebUI 设置中创建的 API Key（abk_xxx），需含 plugin 权限"
+            echo "  SSH_HOST          AstrBot 所在服务器地址（IP 或域名）"
+            echo "  SSH_USER          SSH 登录用户名"
+            echo "  SSH_PRIVATE_KEY   SSH 私钥（OpenSSH 格式，建议免密）"
+            echo "  ASTRBOT_API_KEY   AstrBot API Key（abk_xxx，需含 plugin 权限）"
+            echo ""
+            echo "可选："
+            echo "  SSH_PORT           SSH 端口（默认 22）"
+            echo "  SSH_PASSPHRASE     私钥口令（若私钥设置了密码）"
+            echo "  SSH_FINGERPRINT    服务器 host key 指纹（建议配置，启用主机校验）"
+            echo "  ASTRBOT_PORT       AstrBot WebUI 端口（默认 6185）"
             exit 1
           fi
 
-      - name: Determine plugin id and repo from metadata
+      - name: Determine plugin id from metadata
         id: meta
-        env:
-          REPO: ${{ github.repository }}
         run: |
           plugin_id=$(grep '^name:' metadata.yaml | awk '{print $2}')
           echo "plugin_id=${plugin_id}"
-          echo "repo=${REPO}"
           echo "plugin_id=${plugin_id}" >> "$GITHUB_OUTPUT"
-          echo "repo=${REPO}" >> "$GITHUB_OUTPUT"
 
-      - name: Update and reload plugin on AstrBot
+      - name: Update and reload plugin on AstrBot via SSH
         id: deploy
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT || '22' }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE }}
+          host_key_check: ${{ secrets.SSH_FINGERPRINT != '' }}
+          fingerprint: ${{ secrets.SSH_FINGERPRINT }}
+          # 把以下环境变量安全传给远程脚本
+          envs: ASTRBOT_PORT,ASTRBOT_API_KEY,PLUGIN_ID,DRY_RUN
         env:
-          ASTRBOT_URL: ${{ secrets.ASTRBOT_URL }}
+          ASTRBOT_PORT: ${{ secrets.ASTRBOT_PORT || '6185' }}
           ASTRBOT_API_KEY: ${{ secrets.ASTRBOT_API_KEY }}
           PLUGIN_ID: ${{ steps.meta.outputs.plugin_id }}
-          REPO: ${{ steps.meta.outputs.repo }}
           DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
-        run: |
+        script: |
           set -euo pipefail
 
-          url=${ASTRBOT_URL%/}
-          base="${url}/api/plugins"
+          base="http://127.0.0.1:${ASTRBOT_PORT}/api/plugins"
 
-          echo "==== AstrBot 自动部署 ===="
-          echo "base_url : ${url}"
+          echo "==== AstrBot 自动部署 (SSH -> localhost) ===="
+          echo "host port: ${ASTRBOT_PORT}"
           echo "plugin_id: ${PLUGIN_ID}"
-          echo "repo     : ${REPO}"
           echo "dry_run  : ${DRY_RUN}"
 
           if [ "${DRY_RUN}" = "true" ]; then
@@ -81,14 +104,17 @@ jobs:
             exit 0
           fi
 
-          # helper: 请求 AstrBot，打印响应并判断是否成功
+          # helper: 请求本机 AstrBot，打印响应并判断是否成功
           # 成功 = HTTP 2xx 且返回 JSON 无 "status":"error"
           astrbot_call() {
             local label=$1; shift
             local resp
             echo ""
             echo ">>> ${label}"
-            resp=$(curl -fsS "$@") || { echo "::error::${label} HTTP 请求失败"; return 1; }
+            if ! resp=$(curl -fsS "$@"); then
+              echo "::error::${label} HTTP 请求失败"
+              return 1
+            fi
             echo "${resp}"
             if echo "${resp}" | grep -q '"status"[[:space:]]*:[[:space:]]*"error"'; then
               echo "::error::${label} 返回业务错误"
@@ -115,18 +141,29 @@ jobs:
 
       - name: Retry update/reload (best-effort) on transient failure
         if: steps.deploy.outcome == 'failure'
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT || '22' }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE }}
+          host_key_check: ${{ secrets.SSH_FINGERPRINT != '' }}
+          fingerprint: ${{ secrets.SSH_FINGERPRINT }}
+          envs: ASTRBOT_PORT,ASTRBOT_API_KEY,PLUGIN_ID
         env:
-          ASTRBOT_URL: ${{ secrets.ASTRBOT_URL }}
+          ASTRBOT_PORT: ${{ secrets.ASTRBOT_PORT || '6185' }}
           ASTRBOT_API_KEY: ${{ secrets.ASTRBOT_API_KEY }}
           PLUGIN_ID: ${{ steps.meta.outputs.plugin_id }}
-        run: |
+        script: |
           echo "::warning::首次调用失败，重试一次（间隔 15s）"
           sleep 15
-          curl -fsS -X POST "${ASTRBOT_URL%/}/api/plugins/${PLUGIN_ID}/update" \
+          base="http://127.0.0.1:${ASTRBOT_PORT}/api/plugins"
+          curl -fsS -X POST "${base}/${PLUGIN_ID}/update" \
             -H "X-API-Key: ${ASTRBOT_API_KEY}" \
             -H "Content-Type: application/json" \
             && echo "" \
-            && curl -fsS -X POST "${ASTRBOT_URL%/}/api/plugins/reload" \
+            && curl -fsS -X POST "${base}/reload" \
             -H "X-API-Key: ${ASTRBOT_API_KEY}" \
             -H "Content-Type: application/json" \
             -d "{\"plugin_id\":\"${PLUGIN_ID}\"}" || true
