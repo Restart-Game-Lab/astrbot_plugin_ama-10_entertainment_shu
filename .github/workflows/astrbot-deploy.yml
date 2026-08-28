@@ -116,10 +116,9 @@ jobs:
             || exit 1
 
           astrbot_call "2/2 重载插件（让新代码生效）" \
-            -X POST "${base}/reload" \
+            -X POST "${base}/${PLUGIN_ID}/reload" \
             -H "X-API-Key: ${ASTRBOT_API_KEY}" \
             -H "Content-Type: application/json" \
-            -d "{\"plugin_id\":\"${PLUGIN_ID}\"}" \
             || exit 1
 
           echo ""
@@ -149,7 +148,6 @@ jobs:
             -H "X-API-Key: ${ASTRBOT_API_KEY}" \
             -H "Content-Type: application/json" \
             && echo "" \
-            && curl -fsS -X POST "${base}/reload" \
+            && curl -fsS -X POST "${base}/${PLUGIN_ID}/reload" \
             -H "X-API-Key: ${ASTRBOT_API_KEY}" \
-            -H "Content-Type: application/json" \
-            -d "{\"plugin_id\":\"${PLUGIN_ID}\"}" || true
+            -H "Content-Type: application/json" || true
