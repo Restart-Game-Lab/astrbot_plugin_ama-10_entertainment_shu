@@ -77,52 +77,52 @@ jobs:
           fingerprint: ${{ secrets.SSH_FINGERPRINT }}
           # 把以下环境变量安全传给远程脚本
           envs: ASTRBOT_PORT,ASTRBOT_API_KEY,PLUGIN_ID
+          script: |
+            set -euo pipefail
+
+            base="http://127.0.0.1:${ASTRBOT_PORT}/api/plugins"
+
+            echo "==== AstrBot 自动部署 (SSH -> localhost) ===="
+            echo "host port: ${ASTRBOT_PORT}"
+            echo "plugin_id: ${PLUGIN_ID}"
+
+            # helper: 请求本机 AstrBot，打印响应并判断是否成功
+            # 成功 = HTTP 2xx 且返回 JSON 无 "status":"error"
+            astrbot_call() {
+              local label=$1; shift
+              local resp
+              echo ""
+              echo ">>> ${label}"
+              if ! resp=$(curl -fsS "$@"); then
+                echo "::error::${label} HTTP 请求失败"
+                return 1
+              fi
+              echo "${resp}"
+              if echo "${resp}" | grep -q '"status"[[:space:]]*:[[:space:]]*"error"'; then
+                echo "::error::${label} 返回业务错误"
+                return 1
+              fi
+              return 0
+            }
+
+            astrbot_call "1/2 更新插件代码（服务端 git pull）" \
+              -X POST "${base}/${PLUGIN_ID}/update" \
+              -H "X-API-Key: ${ASTRBOT_API_KEY}" \
+              -H "Content-Type: application/json" \
+              || exit 1
+
+            astrbot_call "2/2 重载插件（让新代码生效）" \
+              -X POST "${base}/${PLUGIN_ID}/reload" \
+              -H "X-API-Key: ${ASTRBOT_API_KEY}" \
+              -H "Content-Type: application/json" \
+              || exit 1
+
+            echo ""
+            echo "==== 部署成功 ===="
         env:
           ASTRBOT_PORT: ${{ secrets.ASTRBOT_PORT || '6185' }}
           ASTRBOT_API_KEY: ${{ secrets.ASTRBOT_API_KEY }}
           PLUGIN_ID: ${{ steps.meta.outputs.plugin_id }}
-        script: |
-          set -euo pipefail
-
-          base="http://127.0.0.1:${ASTRBOT_PORT}/api/plugins"
-
-          echo "==== AstrBot 自动部署 (SSH -> localhost) ===="
-          echo "host port: ${ASTRBOT_PORT}"
-          echo "plugin_id: ${PLUGIN_ID}"
-
-          # helper: 请求本机 AstrBot，打印响应并判断是否成功
-          # 成功 = HTTP 2xx 且返回 JSON 无 "status":"error"
-          astrbot_call() {
-            local label=$1; shift
-            local resp
-            echo ""
-            echo ">>> ${label}"
-            if ! resp=$(curl -fsS "$@"); then
-              echo "::error::${label} HTTP 请求失败"
-              return 1
-            fi
-            echo "${resp}"
-            if echo "${resp}" | grep -q '"status"[[:space:]]*:[[:space:]]*"error"'; then
-              echo "::error::${label} 返回业务错误"
-              return 1
-            fi
-            return 0
-          }
-
-          astrbot_call "1/2 更新插件代码（服务端 git pull）" \
-            -X POST "${base}/${PLUGIN_ID}/update" \
-            -H "X-API-Key: ${ASTRBOT_API_KEY}" \
-            -H "Content-Type: application/json" \
-            || exit 1
-
-          astrbot_call "2/2 重载插件（让新代码生效）" \
-            -X POST "${base}/${PLUGIN_ID}/reload" \
-            -H "X-API-Key: ${ASTRBOT_API_KEY}" \
-            -H "Content-Type: application/json" \
-            || exit 1
-
-          echo ""
-          echo "==== 部署成功 ===="
 
       - name: Retry update/reload (best-effort) on transient failure
         if: steps.deploy.outcome == 'failure'
@@ -136,18 +136,18 @@ jobs:
           host_key_check: ${{ secrets.SSH_FINGERPRINT != '' }}
           fingerprint: ${{ secrets.SSH_FINGERPRINT }}
           envs: ASTRBOT_PORT,ASTRBOT_API_KEY,PLUGIN_ID
+          script: |
+            echo "::warning::首次调用失败，重试一次（间隔 15s）"
+            sleep 15
+            base="http://127.0.0.1:${ASTRBOT_PORT}/api/plugins"
+            curl -fsS -X POST "${base}/${PLUGIN_ID}/update" \
+              -H "X-API-Key: ${ASTRBOT_API_KEY}" \
+              -H "Content-Type: application/json" \
+              && echo "" \
+              && curl -fsS -X POST "${base}/${PLUGIN_ID}/reload" \
+              -H "X-API-Key: ${ASTRBOT_API_KEY}" \
+              -H "Content-Type: application/json" || true
         env:
           ASTRBOT_PORT: ${{ secrets.ASTRBOT_PORT || '6185' }}
           ASTRBOT_API_KEY: ${{ secrets.ASTRBOT_API_KEY }}
           PLUGIN_ID: ${{ steps.meta.outputs.plugin_id }}
-        script: |
-          echo "::warning::首次调用失败，重试一次（间隔 15s）"
-          sleep 15
-          base="http://127.0.0.1:${ASTRBOT_PORT}/api/plugins"
-          curl -fsS -X POST "${base}/${PLUGIN_ID}/update" \
-            -H "X-API-Key: ${ASTRBOT_API_KEY}" \
-            -H "Content-Type: application/json" \
-            && echo "" \
-            && curl -fsS -X POST "${base}/${PLUGIN_ID}/reload" \
-            -H "X-API-Key: ${ASTRBOT_API_KEY}" \
-            -H "Content-Type: application/json" || true
