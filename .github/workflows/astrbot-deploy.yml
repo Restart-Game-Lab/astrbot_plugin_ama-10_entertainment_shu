@@ -89,12 +89,13 @@ jobs:
 
             # helper: 请求本机 AstrBot，打印响应与 HTTP 状态码并判断是否成功
             # 成功 = HTTP 2xx 且返回 JSON 无 "status":"error"
+            # curl 统一超时 300 秒（update 端点需在容器内 git pull，可能较慢）
             astrbot_call() {
               local label=$1; shift
               local out code body
               echo ""
               echo ">>> ${label}"
-              out=$(curl -sS -w $'\n%{http_code}' "$@") || { echo "::error::${label} 网络请求失败"; return 1; }
+              out=$(curl -sS --max-time 300 -w $'\n%{http_code}' "$@") || { echo "::error::${label} 网络请求失败或超时(300s)"; return 1; }
               code="${out##*$'\n'}"
               body="${out%$'\n'*}"
               echo "${body}"
@@ -123,33 +124,6 @@ jobs:
 
             echo ""
             echo "==== 部署成功 ===="
-        env:
-          ASTRBOT_PORT: ${{ secrets.ASTRBOT_PORT || '6185' }}
-          ASTRBOT_API_KEY: ${{ secrets.ASTRBOT_API_KEY }}
-          PLUGIN_ID: ${{ steps.meta.outputs.plugin_id }}
-
-      - name: Retry update/reload (best-effort) on transient failure
-        if: steps.deploy.outcome == 'failure'
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.SSH_PORT || '22' }}
-          passphrase: ${{ secrets.SSH_PASSPHRASE }}
-          fingerprint: ${{ secrets.SSH_FINGERPRINT }}
-          envs: ASTRBOT_PORT,ASTRBOT_API_KEY,PLUGIN_ID
-          script: |
-            echo "::warning::首次调用失败，重试一次（间隔 15s）"
-            sleep 15
-            base="http://127.0.0.1:${ASTRBOT_PORT}/api/v1/plugins"
-            curl -fsS -X POST "${base}/${PLUGIN_ID}/update" \
-              -H "X-API-Key: ${ASTRBOT_API_KEY}" \
-              -H "Content-Type: application/json" \
-              && echo "" \
-              && curl -fsS -X POST "${base}/${PLUGIN_ID}/reload" \
-              -H "X-API-Key: ${ASTRBOT_API_KEY}" \
-              -H "Content-Type: application/json" || true
         env:
           ASTRBOT_PORT: ${{ secrets.ASTRBOT_PORT || '6185' }}
           ASTRBOT_API_KEY: ${{ secrets.ASTRBOT_API_KEY }}
