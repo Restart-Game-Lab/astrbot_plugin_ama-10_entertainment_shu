@@ -1,3 +1,5 @@
+# AMA-10 Entertainment SHU
+
 <div align="center">
 
 <img src="https://count.getloli.com/@preca-hoshino?name=ama-10_entertainment_shu&theme=rule34&padding=7&offset=0&align=top&scale=1&pixelated=1&darkmode=auto" alt="Moe Counter">
