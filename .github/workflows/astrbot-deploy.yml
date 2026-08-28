@@ -95,7 +95,7 @@ jobs:
               local out code body
               echo ""
               echo ">>> ${label}"
-              out=$(curl -sS --max-time 300 -w $'\n%{http_code}' "$@") || { echo "::error::${label} 网络请求失败或超时(300s)"; return 1; }
+              out=$(curl -sS --max-time 3000 -w $'\n%{http_code}' "$@") || { echo "::error::${label} 网络请求失败或超时(300s)"; return 1; }
               code="${out##*$'\n'}"
               body="${out%$'\n'*}"
               echo "${body}"
