@@ -115,7 +115,7 @@ async def _iter_results(result) -> AsyncIterator:
 
 
 @register(
-    "astrbot_plugin_ama-10_entertainment_shu",
+    "astrbot_plugin_ama_10_entertainment_shu",
     "Restart-Game-Lab",
     "上海大学学盟社等群聊相关命令插件: 每个命令对应 src/ 下的一个子文件夹, 子文件夹内放置执行文件与资源",
     "v1.9.0",
