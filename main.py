@@ -21,6 +21,7 @@ main.py - AMA-10 Entertainment Shu 插件主文件
   /鼠鼠导航  → src/鼠鼠导航/handler.py
   /校园地图  → src/校园地图/handler.py
   /学盟圣经  → src/学盟圣经/handler.py
+  /学盟攻略  → src/学盟攻略/handler.py
   /群萝莉    → src/群萝莉/handler.py
 
 命令文件夹约定:
@@ -63,6 +64,7 @@ COMMAND_DIRS: dict[str, str] = {
     "shu_nav": "鼠鼠导航",  # /鼠鼠导航
     "campus_map": "校园地图",  # /校园地图
     "bible": "学盟圣经",  # /学盟圣经
+    "guide": "学盟攻略",  # /学盟攻略
     "group_loli": "群萝莉",  # /群萝莉
 }
 
@@ -118,7 +120,7 @@ async def _iter_results(result) -> AsyncIterator:
     "astrbot_plugin_ama_10_entertainment_shu",
     "Restart-Game-Lab",
     "上海大学学盟社等群聊相关命令插件: 每个命令对应 src/ 下的一个子文件夹, 子文件夹内放置执行文件与资源",
-    "v1.9.0",
+    "v1.10.0",
     "https://github.com/Restart-Game-Lab/astrbot_plugin_ama-10_entertainment_shu",
 )
 class Main(Star):
@@ -209,6 +211,12 @@ class Main(Star):
     async def bible(self, event: AstrMessageEvent):
         """发送学盟圣经内容"""
         async for item in self._dispatch(event, COMMAND_DIRS["bible"]):
+            yield item
+
+    @filter.command("学盟攻略")
+    async def guide(self, event: AstrMessageEvent):
+        """发送学盟攻略功能集合(纯文本)"""
+        async for item in self._dispatch(event, COMMAND_DIRS["guide"]):
             yield item
 
     @filter.command("群萝莉")
