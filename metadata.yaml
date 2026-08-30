@@ -2,7 +2,7 @@ name: astrbot_plugin_ama_10_entertainment_shu
 display_name: AMA-10 Entertainment SHU
 short_desc: 上海大学学盟社等群聊相关命令插件
 desc: 上海大学学盟社等群聊相关命令插件，每个命令对应 src/ 下的一个子文件夹, 子文件夹内放置执行文件与资源。
-version: v1.10.0
+version: v1.11.0
 author: Restart-Game-Lab
 repo: https://github.com/Restart-Game-Lab/astrbot_plugin_ama-10_entertainment_shu
 license: AGPL-3.0

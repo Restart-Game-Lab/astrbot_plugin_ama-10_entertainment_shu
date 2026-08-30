@@ -20,6 +20,7 @@ main.py - AMA-10 Entertainment Shu 插件主文件
   /专业分流  → src/专业分流/handler.py
   /鼠鼠导航  → src/鼠鼠导航/handler.py
   /校园地图  → src/校园地图/handler.py
+  /校园网    → src/校园网/handler.py
   /学盟圣经  → src/学盟圣经/handler.py
   /学盟攻略  → src/学盟攻略/handler.py
   /群萝莉    → src/群萝莉/handler.py
@@ -63,6 +64,7 @@ COMMAND_DIRS: dict[str, str] = {
     "major_division": "专业分流",  # /专业分流
     "shu_nav": "鼠鼠导航",  # /鼠鼠导航
     "campus_map": "校园地图",  # /校园地图
+    "campus_network": "校园网",  # /校园网
     "bible": "学盟圣经",  # /学盟圣经
     "guide": "学盟攻略",  # /学盟攻略
     "group_loli": "群萝莉",  # /群萝莉
@@ -120,7 +122,7 @@ async def _iter_results(result) -> AsyncIterator:
     "astrbot_plugin_ama_10_entertainment_shu",
     "Restart-Game-Lab",
     "上海大学学盟社等群聊相关命令插件: 每个命令对应 src/ 下的一个子文件夹, 子文件夹内放置执行文件与资源",
-    "v1.10.0",
+    "v1.11.0",
     "https://github.com/Restart-Game-Lab/astrbot_plugin_ama-10_entertainment_shu",
 )
 class Main(Star):
@@ -205,6 +207,12 @@ class Main(Star):
     async def campus_map(self, event: AstrMessageEvent):
         """发送校园地图图片"""
         async for item in self._dispatch(event, COMMAND_DIRS["campus_map"]):
+            yield item
+
+    @filter.command("校园网")
+    async def campus_network(self, event: AstrMessageEvent):
+        """发送上海大学校园网接入说明"""
+        async for item in self._dispatch(event, COMMAND_DIRS["campus_network"]):
             yield item
 
     @filter.command("学盟圣经")
