@@ -24,6 +24,7 @@ main.py - AMA-10 Entertainment Shu 插件主文件
   /学盟圣经  → src/学盟圣经/handler.py
   /学盟攻略  → src/学盟攻略/handler.py
   /群萝莉    → src/群萝莉/handler.py
+  /LGTM      → src/LGTM/handler.py
 
 命令文件夹约定:
   src/<命令文件夹>/handler.py
@@ -69,6 +70,7 @@ COMMAND_DIRS: dict[str, str] = {
     "guide": "学盟攻略",  # /学盟攻略
     "group_loli": "群萝莉",  # /群萝莉
     "credit_transfer": "学分转换",  # /学分转换
+    "lgtm": "LGTM",  # /LGTM
 }
 
 # 命令文件夹内执行文件的固定名称
@@ -238,6 +240,12 @@ class Main(Star):
     async def credit_transfer(self, event: AstrMessageEvent):
         """发送学分转换图片"""
         async for item in self._dispatch(event, COMMAND_DIRS["credit_transfer"]):
+            yield item
+
+    @filter.command("LGTM")
+    async def lgtm(self, event: AstrMessageEvent):
+        """发送 LGTM 图片(所属学盟圣经)"""
+        async for item in self._dispatch(event, COMMAND_DIRS["lgtm"]):
             yield item
 
     async def _dispatch(self, event: AstrMessageEvent, folder: str):

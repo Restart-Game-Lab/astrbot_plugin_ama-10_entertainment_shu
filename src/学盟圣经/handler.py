@@ -21,7 +21,8 @@ IMG_PATH = IMG_DIR / "Image_1787761317379_551.gif"
 BIBLE_TEXT = """《学盟圣经》
 1. /落姬坡
 2. /醉萌亭记
-3. /群萝莉"""
+3. /群萝莉
+4. /LGTM"""
 
 
 async def handle(event):
