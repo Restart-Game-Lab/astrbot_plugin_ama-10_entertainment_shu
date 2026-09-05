@@ -84,7 +84,7 @@ jobs:
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
           fingerprint: ${{ secrets.SSH_FINGERPRINT }}
           # 把以下环境变量安全传给远程脚本
-          envs: ASTRBOT_PORT,ASTRBOT_API_KEY,PLUGIN_DIR,PLUGIN_ID,PLUGIN_REPO
+          envs: ASTRBOT_PORT,ASTRBOT_API_KEY,PLUGIN_DIR,PLUGIN_ID,PLUGIN_REPO,GIT_MIRROR
           script: |
             set -euo pipefail
 
@@ -97,6 +97,17 @@ jobs:
             echo "plugin dir: ${PLUGIN_DIR}"
             echo "plugin id : ${PLUGIN_ID}"
             echo "plugin repo: ${PLUGIN_REPO}"
+
+            # git 加速镜像（可选）: 默认 ghproxy.net（实测可用），
+            # 可通过仓库变量 GIT_MIRROR 覆盖（留空则直连 GitHub）。
+            # 用 insteadOf 自动改写, clone 和 fetch 都走镜像。
+            GIT_MIRROR="${GIT_MIRROR:-https://ghproxy.net/}"
+            if [ -n "${GIT_MIRROR}" ]; then
+              echo "git mirror: ${GIT_MIRROR}"
+              export GIT_CONFIG_COUNT=1
+              export GIT_CONFIG_KEY_0="url.${GIT_MIRROR}https://github.com/.insteadOf"
+              export GIT_CONFIG_VALUE_0="https://github.com/"
+            fi
 
             plugin_path="${PLUGIN_DIR}/${PLUGIN_ID}"
 
@@ -147,3 +158,4 @@ jobs:
           PLUGIN_DIR: ${{ secrets.PLUGIN_DIR }}
           PLUGIN_ID: ${{ steps.meta.outputs.plugin_id }}
           PLUGIN_REPO: ${{ github.server_url }}/${{ github.repository }}
+          GIT_MIRROR: ${{ vars.GIT_MIRROR }}
