@@ -16,4 +16,4 @@ iOS端：
 
 async def handle(event):
     """发送 ShuYo 校园软件说明。"""
-    yield f"\u200b{SHUYO_TEXT}\n\n[2026/9/5]"
+    yield f"\u200b{SHUYO_TEXT}\n\n[2026/9/5]\n@Lilin-1024"

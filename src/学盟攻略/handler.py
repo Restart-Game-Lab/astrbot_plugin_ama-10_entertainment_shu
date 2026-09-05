@@ -28,4 +28,4 @@ GUIDE_TEXT = """《学盟攻略》
 
 async def handle(event):
     """发送功能集合文本说明, 纯文本, 不含图片。"""
-    yield f"\u200b{GUIDE_TEXT}\n\n[2026/8/30]"
+    yield f"\u200b{GUIDE_TEXT}\n\n[2026/8/30]\n@Lilin-1024 @preca-hoshino"

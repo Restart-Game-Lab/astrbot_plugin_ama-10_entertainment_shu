@@ -20,5 +20,5 @@ IMG_PATH = IMG_DIR / "学分转换.jpg"
 
 async def handle(event):
     """发送文本说明 + 图片, 合并进同一条消息。"""
-    yield "\u200b上海大学学分转换说明\n\n[2026/9/5]"
+    yield "\u200b上海大学学分转换说明\n\n[2026/9/5]\n@orpnq"
     yield IMG_PATH.read_bytes()
