@@ -1,13 +1,19 @@
-name: AstrBot Deploy via SSH (Update + Reload)
+name: AstrBot Deploy via SSH (Git Pull + Reload)
 
 # AstrBot 端口不对外（仅监听 127.0.0.1）时的自动更新方案：
 # 每次 push 到 main 分支后，GitHub Actions 通过 SSH 登录 AstrBot 所在服务器，
-# 在服务器本地调用 http://127.0.0.1:<port>/api/plugins/... 实现"提交即生效"。
+# 在插件目录内用【原生 git】拉取最新代码，再调用本机 OpenAPI 重载插件：
+#   POST http://127.0.0.1:<port>/api/v1/plugins/<plugin_id>/reload
+#
+# 相比 AstrBot 内置 update（服务端下载 zip）：原生 git 增量拉取更快更稳，
+# 不受 zip 下载服务/加速站可用性影响。
 #
 # 服务器需满足：
 #   1. SSH 可用（OpenSSH Server），且能免密/密钥登录
 #   2. AstrBot 在本机运行，WebUI 端口（默认 6185）监听 127.0.0.1
-#   3. 插件以 git clone 方式安装（metadata.yaml 的 repo 指向本仓库）
+#   3. 插件目录位于 PLUGIN_DIR 机密指定的根目录下（如 /docker/Astrbot/astrbot/plugins）
+#      - 已是 git 仓库：脚本 fetch + reset 对齐到远端分支
+#      - 非 git 仓库（旧安装）：首次自动备份旧目录并 clone 成 git 仓库
 on:
   push:
     branches: [main]
@@ -33,12 +39,14 @@ jobs:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER }}
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          PLUGIN_DIR: ${{ secrets.PLUGIN_DIR }}
           ASTRBOT_API_KEY: ${{ secrets.ASTRBOT_API_KEY }}
         run: |
           miss=""
           [ -z "$SSH_HOST" ] && miss="$miss SSH_HOST"
           [ -z "$SSH_USER" ] && miss="$miss SSH_USER"
           [ -z "$SSH_PRIVATE_KEY" ] && miss="$miss SSH_PRIVATE_KEY"
+          [ -z "$PLUGIN_DIR" ] && miss="$miss PLUGIN_DIR"
           [ -z "$ASTRBOT_API_KEY" ] && miss="$miss ASTRBOT_API_KEY"
           if [ -n "$miss" ]; then
             echo "::error::Missing required secrets:$miss"
@@ -47,6 +55,7 @@ jobs:
             echo "  SSH_HOST          AstrBot 所在服务器地址（IP 或域名）"
             echo "  SSH_USER          SSH 登录用户名"
             echo "  SSH_PRIVATE_KEY   SSH 私钥（OpenSSH 格式，建议免密）"
+            echo "  PLUGIN_DIR        AstrBot 插件目录（如 /docker/Astrbot/astrbot/plugins）"
             echo "  ASTRBOT_API_KEY   AstrBot API Key（abk_xxx，需含 plugin 权限）"
             echo ""
             echo "可选："
@@ -64,7 +73,7 @@ jobs:
           echo "plugin_id=${plugin_id}"
           echo "plugin_id=${plugin_id}" >> "$GITHUB_OUTPUT"
 
-      - name: Update and reload plugin on AstrBot via SSH
+      - name: Git pull and reload plugin on AstrBot via SSH
         id: deploy
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -75,65 +84,66 @@ jobs:
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
           fingerprint: ${{ secrets.SSH_FINGERPRINT }}
           # 把以下环境变量安全传给远程脚本
-          envs: ASTRBOT_PORT,ASTRBOT_API_KEY,PLUGIN_ID,PROXY
+          envs: ASTRBOT_PORT,ASTRBOT_API_KEY,PLUGIN_DIR,PLUGIN_ID,PLUGIN_REPO
           script: |
             set -euo pipefail
 
             # 注意: 必须用 /api/v1/ (OpenAPI) 前缀, API Key 只对 v1 生效。
             # /api/plugins (Dashboard) 只接受 WebUI JWT, 会对 API Key 返回 401。
-            base="http://127.0.0.1:${ASTRBOT_PORT}/api/v1/plugins"
+            api_base="http://127.0.0.1:${ASTRBOT_PORT}/api/v1/plugins"
 
-            echo "==== AstrBot 自动部署 (SSH -> localhost) ===="
-            echo "host port: ${ASTRBOT_PORT}"
-            echo "plugin_id: ${PLUGIN_ID}"
-            echo "proxy    : ${PROXY}"
+            echo "==== AstrBot 自动部署 (SSH -> git pull + reload) ===="
+            echo "host port : ${ASTRBOT_PORT}"
+            echo "plugin dir: ${PLUGIN_DIR}"
+            echo "plugin id : ${PLUGIN_ID}"
+            echo "plugin repo: ${PLUGIN_REPO}"
 
-            # helper: 请求本机 AstrBot，打印响应与 HTTP 状态码并判断是否成功
-            # 成功 = HTTP 2xx 且返回 JSON 无 "status":"error"
-            astrbot_call() {
-              local label=$1; shift
-              local out code body
-              echo ""
-              echo ">>> ${label}"
-              out=$(curl -sS --max-time 300 -w $'\n%{http_code}' "$@") || { echo "::error::${label} 网络请求失败或超时(300s)"; return 1; }
-              code="${out##*$'\n'}"
-              body="${out%$'\n'*}"
-              echo "${body}"
-              if [ "${code}" -ge 200 ] && [ "${code}" -lt 300 ]; then
-                if echo "${body}" | grep -q '"status"[[:space:]]*:[[:space:]]*"error"'; then
-                  echo "::error::${label} 返回业务错误 (HTTP ${code})"
-                  return 1
-                fi
-                return 0
-              fi
-              echo "::error::${label} HTTP 请求失败 (${code})"
-              return 1
-            }
+            plugin_path="${PLUGIN_DIR}/${PLUGIN_ID}"
 
-            # update 请求体: 传给 AstrBot 的 proxy 字段(加速站), 加速大文件下载
-            if [ -n "${PROXY}" ]; then
-              update_body="{\"proxy\":\"${PROXY}\"}"
-            else
-              update_body=""
-            fi
-
-            astrbot_call "1/2 更新插件代码（服务端 zip 下载）" \
-              -X POST "${base}/${PLUGIN_ID}/update" \
-              -H "X-API-Key: ${ASTRBOT_API_KEY}" \
-              -H "Content-Type: application/json" \
-              -d "${update_body}" \
-              || exit 1
-
-            astrbot_call "2/2 重载插件（让新代码生效）" \
-              -X POST "${base}/${PLUGIN_ID}/reload" \
-              -H "X-API-Key: ${ASTRBOT_API_KEY}" \
-              -H "Content-Type: application/json" \
-              || exit 1
-
+            # ---------- 1. 原生 git 拉取最新代码 ----------
             echo ""
-            echo "==== 部署成功 ===="
+            echo ">>> 1/2 git 拉取最新代码: ${plugin_path}"
+            mkdir -p "${PLUGIN_DIR}"
+            if [ ! -d "${plugin_path}/.git" ]; then
+              # 不是 git 仓库（旧 zip 安装）: 备份旧目录后 clone 成 git 仓库
+              echo "目录不是 git 仓库，转换为 git 安装（保留备份）..."
+              if [ -d "${plugin_path}" ]; then
+                mv "${plugin_path}" "${plugin_path}.bak-$(date +%Y%m%d%H%M%S)"
+                echo "已备份旧目录 -> ${plugin_path}.bak-*"
+              fi
+              git clone --depth 1 "${PLUGIN_REPO}" "${plugin_path}"
+            else
+              cd "${plugin_path}"
+              echo "> git fetch 远端..."
+              git fetch origin
+              # 拉取仓库默认分支的最新提交, 报错分支不存在时打印现有分支
+              default_branch=$(git remote show origin | awk '/HEAD branch/ {print $NF}')
+              echo "> default branch: ${default_branch}"
+              git reset --hard origin/${default_branch}
+              git clean -fd
+            fi
+            echo "> 当前版本: $(git -C "${plugin_path}" log --oneline -1)"
+
+            # ---------- 2. 调 OpenAPI 重载插件 ----------
+            echo ""
+            echo ">>> 2/2 重载插件（让新代码生效）"
+            out=$(curl -sS --max-time 300 -w $'\n%{http_code}' \
+              -X POST "${api_base}/${PLUGIN_ID}/reload" \
+              -H "X-API-Key: ${ASTRBOT_API_KEY}" \
+              -H "Content-Type: application/json") || { echo "::error::重载请求失败或超时(300s)"; exit 1; }
+            code="${out##*$'\n'}"
+            body="${out%$'\n'*}"
+            echo "${body}"
+            if [ "${code}" -ge 200 ] && [ "${code}" -lt 300 ] && ! echo "${body}" | grep -q '"status"[[:space:]]*:[[:space:]]*"error"'; then
+              echo ""
+              echo "==== 部署成功 ===="
+            else
+              echo "::error::重载失败 (HTTP ${code})"
+              exit 1
+            fi
         env:
           ASTRBOT_PORT: ${{ secrets.ASTRBOT_PORT || '6185' }}
           ASTRBOT_API_KEY: ${{ secrets.ASTRBOT_API_KEY }}
+          PLUGIN_DIR: ${{ secrets.PLUGIN_DIR }}
           PLUGIN_ID: ${{ steps.meta.outputs.plugin_id }}
-          PROXY: ${{ vars.ASTRBOT_PROXY }}
+          PLUGIN_REPO: ${{ github.server_url }}/${{ github.repository }}
