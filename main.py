@@ -35,9 +35,12 @@ main.py - AMA-10 Entertainment Shu 插件主文件
     - 可通过 event.message_str / event.get_message_args() 读取指令参数
 """
 
+import asyncio
 import base64
 import importlib.util
 import os
+import threading
+import urllib.request
 from pathlib import Path
 from typing import AsyncIterator
 
@@ -50,6 +53,9 @@ PLUGIN_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 
 # 业务代码目录(命令模块收存在 src/ 下)
 SRC_DIR = PLUGIN_DIR / "src"
+
+# README 中展示的 Moe Counter 统计地址: 每次命令调用异步 +1, 不阻塞命令响应
+MOE_COUNTER_URL = "https://count.getloli.com/@ama_10_entertainment_shu"
 
 # 命令 -> src/ 下的命令文件夹 映射:新增命令时在此注册新文件夹即可
 COMMAND_DIRS: dict[str, str] = {
@@ -80,6 +86,25 @@ HANDLER_FILE = "handler.py"
 
 # 动态加载模块时使用的唯一前缀, 避免多次加载/重载时模块缓存冲突
 _MODULE_PREFIX = "ama10_entertainment_shu"
+
+
+def _report_counter() -> None:
+    """异步上报一次 Moe Counter 计数(URL 访问 +1), 不阻塞调用方。"""
+    try:
+        request = urllib.request.Request(MOE_COUNTER_URL, method="GET")
+        with urllib.request.urlopen(request, timeout=5) as response:
+            # 读取并丢弃响应体, 确保连接正常关闭
+            response.read()
+    except Exception as e:
+        logger.debug(f"AMA-10 Entertainment Shu: Moe Counter 上报失败(不影响指令): {e}")
+
+
+async def _report_counter_async() -> None:
+    """在线程池中执行上报, 避免阻塞事件循环。"""
+    try:
+        await asyncio.to_thread(_report_counter)
+    except Exception as e:
+        logger.debug(f"AMA-10 Entertainment Shu: Moe Counter 异步上报异常(不影响指令): {e}")
 
 
 def _load_handler(folder: str):
@@ -258,6 +283,8 @@ class Main(Star):
 
     async def _dispatch(self, event: AstrMessageEvent, folder: str):
         """加载命令文件夹的执行文件, 将其产出的文本+图片合并为同一条消息链发送。"""
+        # 每次命令调用异步上报一次 Moe Counter, 不 await、不阻塞指令响应
+        self._schedule_counter_report()
         module = _load_handler(folder)
         if module is None:
             yield event.plain_result(
@@ -296,3 +323,20 @@ class Main(Star):
         except Exception as e:
             logger.error(f"AMA-10 Entertainment Shu: 执行 {folder}/{HANDLER_FILE} 出错: {e}")
             yield event.plain_result("指令执行出错, 请查看插件日志。")
+
+    def _schedule_counter_report(self) -> None:
+        """调度后台任务上报计数: fire-and-forget, 失败不影响命令执行。"""
+        try:
+            task = asyncio.get_running_loop().create_task(_report_counter_async())
+            task.add_done_callback(_on_counter_report_done)
+        except RuntimeError:
+            # 无运行中的事件循环(极少数同步调用场景): 直接线程上报
+            threading.Thread(target=_report_counter, daemon=True).start()
+
+
+def _on_counter_report_done(task: asyncio.Task) -> None:
+    """后台上报任务完成回调: 兜底捕获异常, 避免"Task exception was never retrieved"。"""
+    try:
+        task.result()
+    except Exception as e:
+        logger.debug(f"AMA-10 Entertainment Shu: Moe Counter 后台任务异常(不影响指令): {e}")
