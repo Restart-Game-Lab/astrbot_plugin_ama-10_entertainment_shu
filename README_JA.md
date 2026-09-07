@@ -2,7 +2,7 @@
 
 <div align="center">
 
-<img src="https://count.getloli.com/@astrbot_plugin_ama_10_entertainment_shu?theme=rule34&padding=7&offset=0&align=top&scale=1&pixelated=1&darkmode=auto" alt="Moe Counter">
+<img src="https://count.getloli.com/@ama_10_entertainment_shu?theme=rule34&padding=7&offset=0&align=top&scale=1&pixelated=1&darkmode=auto" alt="Moe Counter">
 
 **上海大学（SHU）情報表示プラグイン** — キャンパス情報やナビ、画像をひとつのコマンドで呼び出せます。
 
