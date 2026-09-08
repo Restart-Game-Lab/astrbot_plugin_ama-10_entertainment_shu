@@ -46,6 +46,7 @@ from typing import AsyncIterator
 
 from astrbot.api import logger
 from astrbot.api.event import filter, AstrMessageEvent, MessageChain
+from astrbot.api.message_components import File
 from astrbot.api.star import Context, Star, register
 
 # 插件自身目录(子文件夹所在位置)
@@ -303,7 +304,11 @@ class Main(Star):
             has_content = False
             result = handler(event)
             async for item in _iter_results(result):
-                if isinstance(item, bytes):
+                if isinstance(item, File):
+                    # 文件附件(如最新 APK): 直接加入消息链
+                    chain.chain.append(item)
+                    has_content = True
+                elif isinstance(item, bytes):
                     # base64 内嵌图片, 不依赖 AstrBot 与协议端(NapCat)共享文件系统
                     chain.base64_image(base64.b64encode(item).decode("utf-8"))
                     has_content = True
