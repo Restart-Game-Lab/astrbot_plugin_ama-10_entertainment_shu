@@ -162,6 +162,25 @@ class Main(Star):
     def __init__(self, context: Context):
         super().__init__(context)
 
+    async def initialize(self) -> None:
+        """插件初始化钩子(AstrBot 在事件循环中 await 调用): 注册后台定时任务。"""
+        await self._setup_shuyo_cron()
+
+    async def _setup_shuyo_cron(self) -> None:
+        """加载 shuyo 命令模块并注册其定时刷新 APK 缓存的任务。"""
+        try:
+            module = _load_handler(COMMAND_DIRS["shuyo"])
+            if module is None:
+                logger.warning("AMA-10 Entertainment Shu: 未加载到 shuyo 命令模块, 跳过 APK 定时下载任务注册")
+                return
+            setup_cron = getattr(module, "setup_cron", None)
+            if setup_cron is None:
+                logger.warning("AMA-10 Entertainment Shu: shuyo 命令模块缺少 setup_cron, 跳过 APK 定时下载任务注册")
+                return
+            await setup_cron(self.context)
+        except Exception as e:
+            logger.error(f"AMA-10 Entertainment Shu: 注册 shuyo APK 定时下载任务失败: {e}")
+
     @filter.command("群号大全")
     async def group_list(self, event: AstrMessageEvent):
         """发送群号大全"""
