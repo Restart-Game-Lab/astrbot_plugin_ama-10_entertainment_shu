@@ -46,7 +46,6 @@ from typing import AsyncIterator
 
 from astrbot.api import logger
 from astrbot.api.event import filter, AstrMessageEvent, MessageChain
-from astrbot.api.message_components import File
 from astrbot.api.star import Context, Star, register
 
 # 插件自身目录(子文件夹所在位置)
@@ -161,25 +160,6 @@ class Main(Star):
 
     def __init__(self, context: Context):
         super().__init__(context)
-
-    async def initialize(self) -> None:
-        """插件初始化钩子(AstrBot 在事件循环中 await 调用): 注册后台定时任务。"""
-        await self._setup_shuyo_cron()
-
-    async def _setup_shuyo_cron(self) -> None:
-        """加载 shuyo 命令模块并注册其定时刷新 APK 缓存的任务。"""
-        try:
-            module = _load_handler(COMMAND_DIRS["shuyo"])
-            if module is None:
-                logger.warning("AMA-10 Entertainment Shu: 未加载到 shuyo 命令模块, 跳过 APK 定时下载任务注册")
-                return
-            setup_cron = getattr(module, "setup_cron", None)
-            if setup_cron is None:
-                logger.warning("AMA-10 Entertainment Shu: shuyo 命令模块缺少 setup_cron, 跳过 APK 定时下载任务注册")
-                return
-            await setup_cron(self.context)
-        except Exception as e:
-            logger.error(f"AMA-10 Entertainment Shu: 注册 shuyo APK 定时下载任务失败: {e}")
 
     @filter.command("群号大全")
     async def group_list(self, event: AstrMessageEvent):
@@ -323,11 +303,7 @@ class Main(Star):
             has_content = False
             result = handler(event)
             async for item in _iter_results(result):
-                if isinstance(item, File):
-                    # 文件附件(如最新 APK): 直接加入消息链
-                    chain.chain.append(item)
-                    has_content = True
-                elif isinstance(item, bytes):
+                if isinstance(item, bytes):
                     # base64 内嵌图片, 不依赖 AstrBot 与协议端(NapCat)共享文件系统
                     chain.base64_image(base64.b64encode(item).decode("utf-8"))
                     has_content = True
