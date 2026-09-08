@@ -5,6 +5,7 @@ shuyo 命令执行文件
 """
 
 SHUYO_TEXT = """ShuYo是一款上大专属校园软件，登入校园统一认证系统即可自动获取课表，使用查找空教室、查阅选课小本本、校内论坛等功能。
+官网：https://www.shuyo.work
 
 安卓端：
 APK安装包访问 https://download.shuyo.work/latest.apk 下载
