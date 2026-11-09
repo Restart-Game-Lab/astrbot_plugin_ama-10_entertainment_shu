@@ -28,7 +28,8 @@ Bank Name: Jingan Sub-branch, Shanghai Pudong Development Bank, Shanghai, P.R.Ch
 Bank Address: No.669, West Beijing Road, Shanghai, P.R.China.
 SWIFT NO.: SPDBCNSHXXX
 
-具体办理要求请以上海大学财务部门或开户银行最新通知为准。"""
+信息来源：https://eportal.shu.edu.cn/dbase/
+具体办理要求请以财务处或开户银行最新通知为准。"""
 
 
 async def handle(event):
