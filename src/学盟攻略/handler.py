@@ -23,8 +23,8 @@ GUIDE_TEXT = """《学盟攻略》
 11. /鼠鼠导航
 12. /校园地图
 13. /学分转换
-15. /shuyo
-16. /开户信息"""
+14. /shuyo
+15. /开户信息"""
 
 
 async def handle(event):
