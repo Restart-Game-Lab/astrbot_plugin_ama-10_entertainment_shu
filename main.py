@@ -25,8 +25,8 @@ main.py - AMA-10 Entertainment Shu 插件主文件
   /学盟攻略  → src/学盟攻略/handler.py
   /群萝莉    → src/群萝莉/handler.py
   /shuyo     → src/shuyo/handler.py
-  /LGTM      → src/LGTM/handler.py
-    /开户信息  → src/开户信息/handler.py
+    /LGTM      → src/LGTM/handler.py
+    /开票信息  → src/开票信息/handler.py
 
 命令文件夹约定:
   src/<命令文件夹>/handler.py
@@ -80,7 +80,7 @@ COMMAND_DIRS: dict[str, str] = {
     "credit_transfer": "学分转换",  # /学分转换
     "shuyo": "shuyo",  # /shuyo
     "lgtm": "LGTM",  # /LGTM
-    "account_info": "开户信息",  # /开户信息
+    "account_info": "开票信息",  # /开票信息
 }
 
 # 命令文件夹内执行文件的固定名称
@@ -283,7 +283,7 @@ class Main(Star):
         async for item in self._dispatch(event, COMMAND_DIRS["lgtm"]):
             yield item
 
-    @filter.command("开户信息")
+    @filter.command("开票信息")
     async def account_info(self, event: AstrMessageEvent):
         """发送上海大学账户及开票信息"""
         async for item in self._dispatch(event, COMMAND_DIRS["account_info"]):
