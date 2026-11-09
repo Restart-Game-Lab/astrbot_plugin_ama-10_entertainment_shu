@@ -26,6 +26,7 @@ main.py - AMA-10 Entertainment Shu 插件主文件
   /群萝莉    → src/群萝莉/handler.py
   /shuyo     → src/shuyo/handler.py
   /LGTM      → src/LGTM/handler.py
+    /开户信息  → src/开户信息/handler.py
 
 命令文件夹约定:
   src/<命令文件夹>/handler.py
@@ -79,6 +80,7 @@ COMMAND_DIRS: dict[str, str] = {
     "credit_transfer": "学分转换",  # /学分转换
     "shuyo": "shuyo",  # /shuyo
     "lgtm": "LGTM",  # /LGTM
+    "account_info": "开户信息",  # /开户信息
 }
 
 # 命令文件夹内执行文件的固定名称
@@ -152,7 +154,7 @@ async def _iter_results(result) -> AsyncIterator:
     "astrbot_plugin_ama_10_entertainment_shu",
     "Restart-Game-Lab",
     "上海大学学盟社等群聊相关命令插件: 每个命令对应 src/ 下的一个子文件夹, 子文件夹内放置执行文件与资源",
-    "v1.11.0",
+    "v1.11.1",
     "https://github.com/Restart-Game-Lab/astrbot_plugin_ama-10_entertainment_shu",
 )
 class Main(Star):
@@ -279,6 +281,12 @@ class Main(Star):
     async def lgtm(self, event: AstrMessageEvent):
         """发送 LGTM 图片(所属学盟圣经)"""
         async for item in self._dispatch(event, COMMAND_DIRS["lgtm"]):
+            yield item
+
+    @filter.command("开户信息")
+    async def account_info(self, event: AstrMessageEvent):
+        """发送上海大学账户及开票信息"""
+        async for item in self._dispatch(event, COMMAND_DIRS["account_info"]):
             yield item
 
     async def _dispatch(self, event: AstrMessageEvent, folder: str):
